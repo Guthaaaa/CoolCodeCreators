@@ -26,10 +26,10 @@ BLACK = (0, 0, 0)
 GOLD = (255, 215, 0)
 
 screen = pygame.display.set_mode((SCREEN_W, SCREEN_H), pygame.FULLSCREEN)
-pygame.display.set_caption('Google Snake: 4 Apple Edition')
+pygame.display.set_caption('Google Snake: Restart Edition')
 clock = pygame.time.Clock()
 font = pygame.font.SysFont("arial", 48, bold=True)
-win_font = pygame.font.SysFont("arial", 100, bold=True)
+large_font = pygame.font.SysFont("arial", 80, bold=True)
 
 # Grid Calculations
 TOTAL_COLS = SCREEN_W // BLOCK_SIZE
@@ -45,98 +45,115 @@ def draw_background():
 
 def draw_eyes(head_x, head_y, dx, dy):
     eye_size = 6
+    # Determine eye direction based on movement
     if dx > 0: left, right = (45, 15), (45, 45)
     elif dx < 0: left, right = (15, 15), (15, 45)
     elif dy < 0: left, right = (15, 15), (45, 15)
-    else: left, right = (45, 15), (45, 45) # Default Right
+    else: left, right = (15, 45), (45, 45) 
 
     for pos in [left, right]:
         pygame.draw.circle(screen, WHITE, (head_x + pos[0], head_y + pos[1]), eye_size + 2)
         pygame.draw.circle(screen, BLACK, (head_x + pos[0], head_y + pos[1]), eye_size)
 
-def game_loop():
-    game_over = False
-    x = (SCREEN_W // 2 // BLOCK_SIZE) * BLOCK_SIZE
-    y = ((SCREEN_H // 2 - HEADER_HEIGHT) // BLOCK_SIZE) * BLOCK_SIZE + HEADER_HEIGHT
+def spawn_multiple_apples(snake_body, snake_len):
+    new_apples = []
+    space_left = MAX_SQUARES - snake_len
+    to_spawn = min(APPLES_PER_SPAWN, space_left)
     
-    dx, dy = 0, 0
-    snake_body = [[x, y]]
-    snake_len = 1
-    score = 0
+    while len(new_apples) < to_spawn:
+        fx = random.randint(0, TOTAL_COLS - 1) * BLOCK_SIZE
+        fy = random.randint(0, TOTAL_ROWS - 1) * BLOCK_SIZE + HEADER_HEIGHT
+        if [fx, fy] not in snake_body and [fx, fy] not in new_apples:
+            new_apples.append([fx, fy])
+    return new_apples
 
-    def spawn_multiple_apples():
-        new_apples = []
-        # Try to spawn 4 apples, but don't exceed remaining empty squares
-        space_left = MAX_SQUARES - snake_len
-        to_spawn = min(APPLES_PER_SPAWN, space_left)
-        
-        while len(new_apples) < to_spawn:
-            fx = random.randint(0, TOTAL_COLS - 1) * BLOCK_SIZE
-            fy = random.randint(0, TOTAL_ROWS - 1) * BLOCK_SIZE + HEADER_HEIGHT
-            # Ensure apple isn't on snake or already in the new apple list
-            if [fx, fy] not in snake_body and [fx, fy] not in new_apples:
-                new_apples.append([fx, fy])
-        return new_apples
+def game_loop():
+    while True: # Main application loop to allow multiple games
+        # --- RESET GAME STATE ---
+        x = (SCREEN_W // 2 // BLOCK_SIZE) * BLOCK_SIZE
+        y = ((SCREEN_H // 2 - HEADER_HEIGHT) // BLOCK_SIZE) * BLOCK_SIZE + HEADER_HEIGHT
+        dx, dy = 0, 0
+        snake_body = [[x, y]]
+        snake_len = 1
+        score = 0
+        apples = spawn_multiple_apples(snake_body, snake_len)
+        game_active = True
+        won = False
 
-    apples = spawn_multiple_apples()
+        # --- INDIVIDUAL MATCH LOOP ---
+        while game_active:
+            for event in pygame.event.get():
+                if event.type == pygame.KEYDOWN:
+                    if event.key == pygame.K_ESCAPE: pygame.quit(); exit()
+                    if event.key == pygame.K_LEFT and dx == 0: dx, dy = -BLOCK_SIZE, 0
+                    elif event.key == pygame.K_RIGHT and dx == 0: dx, dy = BLOCK_SIZE, 0
+                    elif event.key == pygame.K_UP and dy == 0: dx, dy = 0, -BLOCK_SIZE
+                    elif event.key == pygame.K_DOWN and dy == 0: dx, dy = 0, BLOCK_SIZE
 
-    while not game_over:
-        for event in pygame.event.get():
-            if event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_ESCAPE: pygame.quit(); exit()
-                if event.key == pygame.K_LEFT and dx == 0: dx, dy = -BLOCK_SIZE, 0
-                elif event.key == pygame.K_RIGHT and dx == 0: dx, dy = BLOCK_SIZE, 0
-                elif event.key == pygame.K_UP and dy == 0: dx, dy = 0, -BLOCK_SIZE
-                elif event.key == pygame.K_DOWN and dy == 0: dx, dy = 0, BLOCK_SIZE
+            x += dx
+            y += dy
 
-        x += dx
-        y += dy
+            # Check Win
+            if snake_len >= MAX_SQUARES:
+                won = True
+                game_active = False
 
-        # Win Condition
-        if snake_len >= MAX_SQUARES:
-            screen.fill(BLACK)
-            win_text = win_font.render("🏆 PERFECT SCORE! 🏆", True, GOLD)
-            screen.blit(win_text, (SCREEN_W//2 - 400, SCREEN_H//2 - 50))
+            # Collision Logic
+            if x < 0 or x >= SCREEN_W or y < HEADER_HEIGHT or y >= SCREEN_H or [x, y] in snake_body[:-1]:
+                game_active = False
+
+            head = [x, y]
+            snake_body.append(head)
+            if len(snake_body) > snake_len: del snake_body[0]
+
+            # Render
+            draw_background()
+            score_text = font.render(f"Score: {score}", True, WHITE)
+            screen.blit(score_text, (40, 20))
+
+            for apple in apples:
+                pygame.draw.circle(screen, COLOR_APPLE, (apple[0] + BLOCK_SIZE//2, apple[1] + BLOCK_SIZE//2), BLOCK_SIZE//2 - 5)
+
+            for part in snake_body:
+                pygame.draw.rect(screen, COLOR_SNAKE, [part[0], part[1], BLOCK_SIZE, BLOCK_SIZE], border_radius=8)
+            
+            draw_eyes(snake_body[-1][0], snake_body[-1][1], dx, dy)
+
+            # Eat Apple
+            if [x, y] in apples:
+                score += 1
+                snake_len += 1
+                apples = spawn_multiple_apples(snake_body, snake_len)
+
             pygame.display.update()
-            time.sleep(3)
-            game_over = True
+            clock.tick(10)
 
-        # Collision
-        if x < 0 or x >= SCREEN_W or y < HEADER_HEIGHT or y >= SCREEN_H or [x, y] in snake_body[:-1]:
-            game_over = True
+        # --- GAME OVER / RESTART SCREEN ---
+        waiting_for_input = True
+        while waiting_for_input:
+            # Semi-transparent overlay
+            overlay = pygame.Surface((SCREEN_W, SCREEN_H))
+            overlay.set_alpha(128)
+            overlay.fill(BLACK)
+            screen.blit(overlay, (0,0))
 
-        head = [x, y]
-        snake_body.append(head)
-        if len(snake_body) > snake_len: del snake_body[0]
+            msg = "🏆 YOU WIN! 🏆" if won else "GAME OVER"
+            color = GOLD if won else WHITE
+            
+            main_txt = large_font.render(msg, True, color)
+            sub_txt = font.render("Press 'R' to Restart or 'ESC' to Quit", True, WHITE)
+            
+            screen.blit(main_txt, (SCREEN_W//2 - main_txt.get_width()//2, SCREEN_H//2 - 100))
+            screen.blit(sub_txt, (SCREEN_W//2 - sub_txt.get_width()//2, SCREEN_H//2 + 20))
+            
+            pygame.display.update()
 
-        draw_background()
-        
-        # UI
-        score_text = font.render(f"Score: {score}", True, WHITE)
-        screen.blit(score_text, (40, 20))
-
-        # Draw All Apples
-        for apple in apples:
-            pygame.draw.circle(screen, COLOR_APPLE, (apple[0] + BLOCK_SIZE//2, apple[1] + BLOCK_SIZE//2), BLOCK_SIZE//2 - 5)
-
-        # Draw Snake
-        for part in snake_body:
-            pygame.draw.rect(screen, COLOR_SNAKE, [part[0], part[1], BLOCK_SIZE, BLOCK_SIZE], border_radius=8)
-        
-        draw_eyes(snake_body[-1][0], snake_body[-1][1], dx, dy)
-
-        # Eating Logic
-        if [x, y] in apples:
-            score += 1
-            snake_len += 1
-            # "After eating 1 piece it spawns another 4" 
-            # This refreshes the whole batch of apples
-            apples = spawn_multiple_apples()
-
-        pygame.display.update()
-        clock.tick(10)
-
-    pygame.quit()
+            for event in pygame.event.get():
+                if event.type == pygame.KEYDOWN:
+                    if event.key == pygame.K_r:
+                        waiting_for_input = False # Break this loop to restart game_loop
+                    if event.key == pygame.K_ESCAPE:
+                        pygame.quit(); exit()
 
 if __name__ == "__main__":
     game_loop()
