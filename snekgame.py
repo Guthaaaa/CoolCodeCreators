@@ -1,3 +1,4 @@
+import sys
 import pygame
 import random
 import time
@@ -115,7 +116,7 @@ def show_summary(final_score):
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_r: return "RESTART"
                 if event.key == pygame.K_m: return "MENU"
-                if event.key == pygame.K_ESCAPE: pygame.quit(); exit()
+                if event.key == pygame.K_ESCAPE: pygame.quit(); sys.exit()
 
 def skin_menu():
     selected_index = 0
@@ -135,7 +136,7 @@ def skin_menu():
                 if event.key == pygame.K_UP: selected_index = (selected_index - 1) % len(skin_names)
                 if event.key == pygame.K_DOWN: selected_index = (selected_index + 1) % len(skin_names)
                 if event.key == pygame.K_RETURN: return skin_names[selected_index]
-                if event.key == pygame.K_ESCAPE: pygame.quit(); exit()
+                if event.key == pygame.K_ESCAPE: pygame.quit(); sys.exit()
 
 def game_loop(skin_name):
     global high_score
